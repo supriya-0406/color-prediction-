@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Color Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .color-display {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            border-radius: 10px;
+            border: 2px solid #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .rgb-controls {
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-container {
+            flex: 1;
+            margin: 0 10px;
+            text-align: center;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .training-status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .prediction {
+            margin-top: 20px;
+            font-weight: bold;
+            min-height: 24px;
+            text-align: center;
+        }
+        .training-progress {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4CAF50;
+            transition: width 0.3s;
+        }
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .example {
+            width: 60px;
+            height: 60px;
+            border-radius: 5px;
+            border: 2px solid #333;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Neural Network Color Predictor</h1>
+        <p>Train a simple neural network to predict if a color is light or dark!</p>
+        
+        <div class="color-display" id="color-display"></div>
+        
+        <div class="controls">
+            <div class="rgb-controls">
+                <div class="slider-container">
+                    <label for="red">Red</label>
+                    <input type="range" id="red" min="0" max="255" value="128">
+                </div>
+                <div class="slider-container">
+                    <label for="green">Green</label>
+                    <input type="range" id="green" min="0" max="255" value="128">
+                </div>
+                <div class="slider-container">
+                    <label for="blue">Blue</label>
+                    <input type="range" id="blue" min="0" max="255" value="128">
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button id="light-btn">Light (Training Example)</button>
+                <button id="dark-btn">Dark (Training Example)</button>
+            </div>
+            
+            <button id="train-btn">Train Network</button>
+            <button id="predict-btn" disabled>Predict Light/Dark</button>
+            <button id="reset-btn">Reset Network</button>
+        </div>
+        
+        <div class="training-status" id="training-status">
+            Training examples: <span id="example-count">0</span>
+        </div>
+        
+        <div class="training-progress">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        
+        <div class="prediction" id="prediction"></div>
+        
+        <h3>Quick Examples:</h3>
+        <div class="examples" id="examples">
+            <!-- Example colors will be added here -->
+        </div>
+    </div>
+
+    <script>
+        // Simple neural network implementation
+        class NeuralNetwork {
+            constructor() {
+                // Initialize with random weights
+                this.weights = [
+                    Math.random() * 0.2 - 0.1, // Red weight
+                    Math.random() * 0.2 - 0.1, // Green weight
+                    Math.random() * 0.2 - 0.1  // Blue weight
+                ];
+                this.bias = Math.random() * 0.2 - 0.1;
+                this.learningRate = 0.1;
+            }
+            
+            // Sigmoid activation function
+            sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+            
+            // Predict if color is light (1) or dark (0)
+            predict(r, g, b) {
+                // Normalize inputs to 0-1 range
+                const nr = r / 255;
+                const ng = g / 255;
+                const nb = b / 255;
+                
+                // Weighted sum + bias
+                const sum = 
+                    nr * this.weights[0] + 
+                    ng * this.weights[1] + 
+                    nb * this.weights[2] + 
+                    this.bias;
+                
+                // Apply activation function
+                return this.sigmoid(sum);
+            }
+            
+            // Train network with one example
+            train(r, g, b, expected) {
+                // Normalize inputs
+                const nr = r / 255;
+                const ng = g / 255;
+                const nb = b / 255;
+                
+                // Forward pass
+                const prediction = this.predict(r, g, b);
+                const error = expected - prediction;
+                
+                // Backpropagation (simple gradient descent)
+                const sigmoidDerivative = prediction * (1 - prediction);
+                
+                this.weights[0] += this.learningRate * error * sigmoidDerivative * nr;
+                this.weights[1] += this.learningRate * error * sigmoidDerivative * ng;
+                this.weights[2] += this.learningRate * error * sigmoidDerivative * nb;
+                this.bias += this.learningRate * error * sigmoidDerivative;
+                
+                return error;
+            }
+        }
+        
+        // App state
+        const nn = new NeuralNetwork();
+        let trainingData = [];
+        const examples = [
+            [255, 255, 255], // White
+            [0, 0, 0],       // Black
+            [255, 0, 0],     // Red
+            [0, 255, 0],     // Green
+            [0, 0, 255],     // Blue
+            [255, 255, 0],   // Yellow
+            [255, 0, 255],   // Magenta
+            [0, 255, 255],   // Cyan
+            [128, 128, 128], // Gray
+            [255, 165, 0]    // Orange
+        ];
+        
+        // DOM elements
+        const colorDisplay = document.getElementById('color-display');
+        const redSlider = document.getElementById('red');
+        const greenSlider = document.getElementById('green');
+        const blueSlider = document.getElementById('blue');
+        const lightBtn = document.getElementById('light-btn');
+        const darkBtn = document.getElementById('dark-btn');
+        const trainBtn = document.getElementById('train-btn');
+        const predictBtn = document.getElementById('predict-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const exampleCount = document.getElementById('example-count');
+        const progressBar = document.getElementById('progress-bar');
+        const predictionText = document.getElementById('prediction');
+        const examplesContainer = document.getElementById('examples');
+        
+        // Update color display
+        function updateColor() {
+            const r = parseInt(redSlider.value);
+            const g = parseInt(greenSlider.value);
+            const b = parseInt(blueSlider.value);
+            colorDisplay.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        // Add example color to training set
+        function addExample(isLight) {
+            const r = parseInt(redSlider.value);
+            const g = parseInt(greenSlider.value);
+            const b = parseInt(blueSlider.value);
+            
+            trainingData.push({
+                r, g, b,
+                label: isLight ? 1 : 0
+            });
+            
+            exampleCount.textContent = trainingData.length;
+            
+            if (trainingData.length >= 3) {
+                trainBtn.disabled = false;
+            }
+        }
+        
+        // Train network with all examples
+        async function trainNetwork() {
+            if (trainingData.length < 3) return;
+            
+            trainBtn.disabled = true;
+            lightBtn.disabled = true;
+            darkBtn.disabled = true;
+            resetBtn.disabled = true;
+            
+            const epochs = 100;
+            let totalError = 0;
+            
+            for (let epoch = 0; epoch < epochs; epoch++) {
+                totalError = 0;
+                
+                // Shuffle training data
+                trainingData.sort(() => Math.random() - 0.5);
+                
+                // Train on each example
+                for (const example of trainingData) {
+                    const error = nn.train(
+                        example.r, example.g, example.b, example.label
+                    );
+                    totalError += Math.abs(error);
+                }
+                
+                // Update progress bar
+                const progress = ((epoch + 1) / epochs) * 100;
+                progressBar.style.width = `${progress}%`;
+                
+                // Small delay to allow UI to update
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            predictionText.textContent = "Training complete! Try predicting some colors.";
+            predictBtn.disabled = false;
+            trainBtn.disabled = false;
+            lightBtn.disabled = false;
+            darkBtn.disabled = false;
+            resetBtn.disabled = false;
+        }
+        
+        // Predict if current color is light or dark
+        function predict() {
+            const r = parseInt(redSlider.value);
+            const g = parseInt(greenSlider.value);
+            const b = parseInt(blueSlider.value);
+            
+            const prediction = nn.predict(r, g, b);
+            const isLight = prediction > 0.5;
+            const confidence = isLight ? 
+                Math.round(prediction * 100) : 
+                Math.round((1 - prediction) * 100);
+            
+            predictionText.textContent = 
+                `Prediction: ${isLight ? 'Light' : 'Dark'} (${confidence}% confidence)`;
+        }
+        
+        // Reset network and training data
+        function reset() {
+            trainingData = [];
+            exampleCount.textContent = '0';
+            progressBar.style.width = '0%';
+            predictionText.textContent = '';
+            
+            // Create new network
+            nn = new NeuralNetwork();
+            
+            predictBtn.disabled = true;
+            trainBtn.disabled = true;
+        }
+        
+        // Initialize example colors
+        function initExamples() {
+            examplesContainer.innerHTML = '';
+            
+            for (const [r, g, b] of examples) {
+                const example = document.createElement('div');
+                example.className = 'example';
+                example.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                
+                example.addEventListener('click', () => {
+                    redSlider.value = r;
+                    greenSlider.value = g;
+                    blueSlider.value = b;
+                    updateColor();
+                });
+                
+                examplesContainer.appendChild(example);
+            }
+        }
+        
+        // Event listeners
+        redSlider.addEventListener('input', updateColor);
+        greenSlider.addEventListener('input', updateColor);
+        blueSlider.addEventListener('input', updateColor);
+        
+        lightBtn.addEventListener('click', () => addExample(true));
+        darkBtn.addEventListener('click', () => addExample(false));
+        trainBtn.addEventListener('click', trainNetwork);
+        predictBtn.addEventListener('click', predict);
+        resetBtn.addEventListener('click', reset);
+        
+        // Initialize
+        updateColor();
+        initExamples();
+    </script>
+</body>
+</html>
